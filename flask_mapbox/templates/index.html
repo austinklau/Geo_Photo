@@ -1,0 +1,110 @@
+<html>
+    <head>
+        <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+        
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+
+        <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+        <title>Home</title>
+        <style>
+            input[type="file"] {
+			opacity: 0;
+			position: absolute;
+			top: 0;
+			right: 0;
+			bottom: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+		}
+        </style>
+    </head>
+    <body>
+        <input type="file" multiple>
+        <div>Drop files here or click to open file picker</div>
+
+        <script src="{{ url_for('static', filename='node_modules/exifr/dist/full.umd.js')}}"></script>
+        <script>
+
+            let dropzone = document.body
+            dropzone.addEventListener('dragenter', e => e.preventDefault())
+            dropzone.addEventListener('dragover', e => e.preventDefault())
+            dropzone.addEventListener('drop', e => {
+                e.preventDefault()
+                parseImages(e.dataTransfer.files)
+            })
+
+            document.querySelector('input[type="file"]').addEventListener('change', e => {
+                e.preventDefault()
+                parseImages(e.target.files)
+            })
+
+
+            async function parseImages(files) {
+                files = Array.from(files)
+
+                let promises = files.map(parseImage).map(promise => promise.catch(() => {}))
+			    let exifs = await Promise.all(promises)
+                console.log(exifs)
+                exifs.sort((a, b) => a.DateTimeOriginal - b.DateTimeOriginal)
+
+                // validation fct
+                function validate(el) {
+                    return el != null && el.hasOwnProperty('latitude')
+                }
+                exifs = exifs.filter(validate)
+                 // sort by date taken
+                // let dates = exifs.map(exif => exif.DateTimeOriginal.toUTCString())
+                // console.log(exifs)
+                // lats and longs, sorted by date, where null values are omitted
+                let coords = new Array(3)
+                coords[0] = exifs.map(exif => exif.latitude)
+                coords[1] = exifs.map(exif => exif.longitude)
+                coords[2] = exifs.map(exif => exif.DateTimeOriginal.toUTCString())
+                
+                const coords_json = JSON.stringify(coords)
+                //console.log(coords_json)
+
+
+                // Function to post that allows for redirects!
+                function post(path, params, method='post') {
+
+                    // The rest of this code assumes you are not using a library.
+                    // It can be made less verbose if you use one.
+                    const form = document.createElement('form');
+                    form.method = method;
+                    form.action = path;
+
+                    for (const key in params) {
+                        if (params.hasOwnProperty(key)) {
+                            const hiddenField = document.createElement('input');
+                            hiddenField.type = 'hidden';
+                            hiddenField.name = key;
+                            hiddenField.value = params[key];
+                            form.appendChild(hiddenField);
+                        }
+                    }
+
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+
+                // Send data back to the server
+                post('/', {data: coords_json});
+
+                //$.post("/", {data : coords_json})
+                // Bandaid solution...
+                //window.location = "/map";
+		    }
+            
+            // parse an image, only get the gps coords and date
+            async function parseImage(file) {
+                return exifr.parse(file,['GPSLatitude', 'GPSLongitude', 'DateTimeOriginal'])
+            }
+
+        </script>
+
+
+        
+    </body>
+</html>
